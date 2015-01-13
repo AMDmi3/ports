@@ -23,17 +23,6 @@ PKGMESSAGE=	${WRKDIR}/pkg-message
 SLAVEDIRS=	databases/mariadb55-client
 USES=		cmake execinfo gmake shebangfix
 SHEBANG_FILES=	scripts/*.sh
-NO_OPTIONS_SORT=yes
-
-OPTIONS_DEFINE+=	FASTMTX
-OPTIONS_RADIO=		SSL
-OPTIONS_RADIO_SSL=	BUNDLED_SSL OPENSSL WITHOUT_SSL
-OPTIONS_DEFAULT+=	OPENSSL
-OPTIONS_SUB=		yes
-
-BUNDLED_SSL_DESC=	SSL/TLS support via (bundled) CyaSSL
-FASTMTX_DESC=	Replace mutexes with spinlocks
-WITHOUT_SSL_DESC=	No SSL/TLS support
 
 CMAKE_ARGS+=	-DINSTALL_DOCDIR="share/doc/mysql" \
 		-DINSTALL_DOCREADMEDIR="share/doc/mysql" \
@@ -56,36 +45,13 @@ CMAKE_ARGS+=	-DINSTALL_DOCDIR="share/doc/mysql" \
 		-DEXECINFO_ROOT=${LOCALBASE} \
 		-DCOMPILATION_COMMENT="FreeBSD Ports"
 
+DATADIR=	${PREFIX}/share/mysql
+
+BROKEN_armv6=		Does not compile on arm
+
 .if defined(USE_MYSQL)
 .error You have 'USE_MYSQL' variable defined either in environment or in make(1) arguments. Please undefine and try again.
 .endif
-
-DATADIR=	${PREFIX}/share/mysql
-
-.if !defined(CLIENT_ONLY)
-# MySQL-Server options
-OPTIONS_DEFINE+=	MAXKEY OQGRAPH
-
-MAXKEY_DESC=	Change max key length from 1000 to 4000
-OQGRAPH_DESC=	Open Query Graph Computation engine
-
-OPTIONS_DEFAULT+=	MAXKEY
-.endif
-
-.include <bsd.port.options.mk>
-
-.if ${OPSYS} == FreeBSD && ${OSVERSION} >= 1000012
-CMAKE_ARGS+=	-DWITH_JEMALLOC="system"
-.else
-CMAKE_ARGS+=	-DWITH_JEMALLOC="no"
-.endif
-
-OPENSSL_CMAKE_ON=	-DWITH_SSL=yes
-OPENSSL_USE=		USE_OPENSSL=yes
-BUNDLED_SSL_CMAKE_ON=	-DWITH_SSL=bundled
-WITHOUT_SSL_CMAKE=	-DWITH_SSL=no
-
-FASTMTX_CMAKE_ON=	-DWITH_FAST_MUTEXES=1
 
 # MySQL-Server part
 .if !defined(CLIENT_ONLY)
@@ -105,13 +71,6 @@ GROUPS=		mysql
 CMAKE_ARGS+=	-DWITH_EMBEDDED_SERVER="ON" \
 		-DWITHOUT_EXAMPLE_STORAGE_ENGINE=1
 
-OQGRAPH_CMAKE_OFF=	-DWITHOUT_OQGRAPH_STORAGE_ENGINE=1
-OQGRAPH_USE=	GCC=yes
-OQGRAPH_CMAKE_ON=	-DWITH_OQGRAPH_STORAGE_ENGINE=1
-OQGRAPH_LIB_DEPENDS=	libboost_system.so:${PORTSDIR}/devel/boost-libs
-
-MAXKEY_EXTRA_PATCHES=	${FILESDIR}/extra-patch-include_my_compare.h
-
 # Server segfaults when built with clang >= 3.4
 .if ${ARCH} == 'i386' && ${OSVERSION} >= 1001000
 USE_GCC=	yes
@@ -122,13 +81,50 @@ USE_GCC=	yes
 USES+=		readline
 .endif
 
+OPTIONS_DEFINE+=	FASTMTX
+OPTIONS_RADIO=		SSL
+OPTIONS_RADIO_SSL=	BUNDLED_SSL OPENSSL WITHOUT_SSL
+OPTIONS_DEFAULT+=	OPENSSL
+OPTIONS_SUB=		yes
+NO_OPTIONS_SORT=yes
+
+BUNDLED_SSL_DESC=	SSL/TLS support via (bundled) CyaSSL
+FASTMTX_DESC=	Replace mutexes with spinlocks
+WITHOUT_SSL_DESC=	No SSL/TLS support
+OPENSSL_CMAKE_ON=	-DWITH_SSL=yes
+OPENSSL_USE=		USE_OPENSSL=yes
+BUNDLED_SSL_CMAKE_ON=	-DWITH_SSL=bundled
+WITHOUT_SSL_CMAKE=	-DWITH_SSL=no
+
+FASTMTX_CMAKE_ON=	-DWITH_FAST_MUTEXES=1
+
+.if !defined(CLIENT_ONLY)
+# MySQL-Server options
+OPTIONS_DEFINE+=	MAXKEY OQGRAPH
+OPTIONS_DEFAULT+=	MAXKEY
+
+MAXKEY_DESC=	Change max key length from 1000 to 4000
+OQGRAPH_DESC=	Open Query Graph Computation engine
+
+OQGRAPH_CMAKE_OFF=	-DWITHOUT_OQGRAPH_STORAGE_ENGINE=1
+OQGRAPH_USE=	GCC=yes
+OQGRAPH_CMAKE_ON=	-DWITH_OQGRAPH_STORAGE_ENGINE=1
+OQGRAPH_LIB_DEPENDS=	libboost_system.so:${PORTSDIR}/devel/boost-libs
+
+MAXKEY_EXTRA_PATCHES=	${FILESDIR}/extra-patch-include_my_compare.h
+.endif
+
+.include <bsd.port.pre.mk>
+
+.if ${OPSYS} == FreeBSD && ${OSVERSION} >= 1000012
+CMAKE_ARGS+=	-DWITH_JEMALLOC="system"
+.else
+CMAKE_ARGS+=	-DWITH_JEMALLOC="no"
+.endif
+
 post-patch:
 	@${REINPLACE_CMD} 's/*.1/${MAN1}/' ${WRKSRC}/man/CMakeLists.txt
 	@${REINPLACE_CMD} 's|%%PREFIX%%|${PREFIX}|g' ${WRKSRC}/mysys/default.c
 	@${REINPLACE_CMD} 's|%%LOCALBASE%%|${LOCALBASE}|g' ${WRKSRC}/scripts/mysql_config.sh
-
-.include <bsd.port.pre.mk>
-
-BROKEN_armv6=		Does not compile on arm
 
 .include <bsd.port.post.mk>
